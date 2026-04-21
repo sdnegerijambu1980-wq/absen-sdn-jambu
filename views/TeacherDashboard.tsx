@@ -18,6 +18,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogo
   const [record, setRecord] = useState<AttendanceRecord | undefined>(undefined);
   const [historyRecords, setHistoryRecords] = useState<AttendanceRecord[]>([]);
   const [peers, setPeers] = useState<AttendanceRecord[]>([]); // State for peer list
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [modalType, setModalType] = useState<'sick' | 'leave' | 'sppd' | 'checkin' | 'checkout' | null>(null);
   
@@ -56,12 +57,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogo
   useEffect(() => {
     setRecord(getTodayRecord(user.id));
     // Load initial peers
-    fetchLivePeers().then(setPeers);
+    fetchLivePeers(user.id).then(setPeers);
 
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     // Refresh peers every 30 seconds to keep it "live" from CSV
     const peerInterval = setInterval(() => {
-       fetchLivePeers().then(setPeers);
+       fetchLivePeers(user.id).then(setPeers);
     }, 30000);
 
     return () => {
@@ -69,6 +70,16 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogo
         clearInterval(peerInterval);
     };
   }, [user.id]);
+
+  const handleRefreshPeers = async () => {
+    setIsRefreshing(true);
+    try {
+        const liveData = await fetchLivePeers(user.id);
+        setPeers(liveData);
+    } finally {
+        setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     if (activeTab === 'history') {
@@ -452,9 +463,18 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogo
              <h3 className="font-bold text-white flex items-center gap-2 text-sm">
                 <Users size={16} className="text-blue-400" /> Rekap Kehadiran Hari Ini
              </h3>
-             <span className="text-[10px] bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-2 py-1 rounded-full font-bold">
-                {peers.length} Data
-             </span>
+             <div className="flex items-center gap-2">
+                <button 
+                  onClick={handleRefreshPeers}
+                  disabled={isRefreshing}
+                  className="text-slate-400 hover:text-white transition-colors p-1"
+                >
+                  <RefreshCw size={14} className={isRefreshing ? 'animate-spin text-blue-400' : ''} />
+                </button>
+                <span className="text-[10px] bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-2 py-1 rounded-full font-bold">
+                   {peers.length} Data
+                </span>
+             </div>
            </div>
            <div className="divide-y divide-slate-700/50 max-h-[250px] overflow-y-auto">
              {peers.length === 0 ? (
@@ -492,7 +512,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogo
                                         'bg-amber-400'
                                     }`}></span>
                                     <p className="text-[10px] text-slate-400">
-                                        {p.type === 'present' ? 'Hadir' : p.type.toUpperCase()}
+                                        {p.type === 'present' ? 'Hadir' : 
+                                         p.type === 'sick' ? 'Sakit' : 
+                                         p.type === 'leave' ? 'Izin' : 
+                                         p.type === 'sppd' ? 'SPPD' : p.type.toUpperCase()}
                                     </p>
                                 </div>
                             </div>

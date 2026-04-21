@@ -334,15 +334,31 @@ export const submitReport = async (
 // URL CSV Publik dari Sheet Absensi
 const LIVE_ABSENSI_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRhhXDs0nazcpQ25Ne_IbHsNI1vO7bBd6_CJv4-LLW1BEmdoZ5B5UA0G8zPQmFAlth1lAhfKdmRswNY/pub?gid=344398975&single=true&output=csv";
 
-export const fetchLivePeers = async (): Promise<AttendanceRecord[]> => {
+export const fetchLivePeers = async (currentUserId?: string): Promise<AttendanceRecord[]> => {
   const todayStr = new Date().toISOString().split('T')[0];
   const peersMap = new Map<string, AttendanceRecord>();
 
-  // 1. Ambil data lokal dulu (supaya Sakit/Izin/SPPD dan status yang baru saja di-submit langsung terlihat)
+  // 1. Ambil data lokal khusus untuk user yang sedang login saja (supaya absennya sendiri langsung terlihat)
+  // Jangan mengambil data lokal user lain, karena jika sedang dites di 1 HP/Laptop yang sama, 
+  // data user lain yang sudah dihapus di CSV akan nge-stuck (selalu muncul) akibat disedot dari localStorage ini.
   const localRecords = getAllTodayRecords();
-  localRecords.forEach(r => peersMap.set(r.userName, { ...r }));
+  localRecords.forEach(r => {
+      if (!currentUserId || r.userId === currentUserId) {
+          peersMap.set(r.userName, { ...r });
+      } else if (currentUserId && r.userId !== currentUserId) {
+          // Jika kita punya data currentUserId (berarti dipanggil dari komponen dashboard),
+          // Kita hiraukan data lokal absen orang lain. Biarkan CSV yang menentukan apakah mereka hadir/tidak.
+      }
+  });
 
-    // 2. Tarik data dari CSV
+  // Muat data master user untuk mencocokkan foto profil (avatar) rekan
+  const allUsers: MockUser[] = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+  const userAvatarMap = new Map<string, string>();
+  allUsers.forEach(u => {
+     if (u.name && u.avatar) userAvatarMap.set(u.name.toLowerCase(), u.avatar);
+  });
+
+  // 2. Tarik data dari CSV
   try {
     // Kami menghapus cache-buster param (_t=) karena Google Docs sering memblokir
     // query param tidak dikenal dan menyebabkannya redirect yang memicu "Failed to fetch" (CORS Error)
@@ -376,11 +392,15 @@ export const fetchLivePeers = async (): Promise<AttendanceRecord[]> => {
 
                   if (!peersMap.has(nama)) {
                      // Jika tidak ada di lokal (misal absen dari HP lain)
+                     // Coba temukan avatar dari master data user
+                     const linkedAvatar = userAvatarMap.get(nama.toLowerCase());
+
                      peersMap.set(nama, {
                         id: nip || nama,
                         userId: nip || nama, // Kita gunakan NIP atau Nama sbg ID jika tdk tahu
                         userName: nama,
                         date: tanggal,
+                        avatar: linkedAvatar, // Menggabungkan foto profil
                         type: exactType as any
                      } as AttendanceRecord);
                   }

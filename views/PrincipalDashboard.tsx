@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, AttendanceRecord } from '../types';
 import { getAllTodayRecords, getAllRecords, downloadMonthlyReport, fetchLivePeers } from '../services/mockBackend';
-import { Download, Users, UserCheck, UserX, Search, School, Home, User as UserIcon, FileDown, Calendar, Clock, AlertTriangle, CheckCircle2, HeartPulse, FileText, Briefcase, MapPin, LogOut } from 'lucide-react';
+import { Download, Users, UserCheck, UserX, Search, School, Home, User as UserIcon, FileDown, Calendar, Clock, AlertTriangle, CheckCircle2, HeartPulse, FileText, Briefcase, MapPin, LogOut, RefreshCw } from 'lucide-react';
 import { ProfileView } from './ProfileView';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -14,6 +14,7 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({ user, on
   const [activeTab, setActiveTab] = useState<'home' | 'history' | 'profile'>('home');
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [historyRecords, setHistoryRecords] = useState<AttendanceRecord[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [filter, setFilter] = useState('');
   const [historyFilter, setHistoryFilter] = useState('');
 
@@ -30,13 +31,27 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({ user, on
     setRecords(localToday);
 
     // Menarik Data Live secara asinkron dari CSV
-    const liveData = await fetchLivePeers();
+    const liveData = await fetchLivePeers(user.id);
     if (liveData && liveData.length > 0) {
         setRecords(liveData); 
+    } else {
+        // Jika tidak ada sama sekali di CSV (mungkin dihapus semua), kita gunakan filter
+        // agar tidak menampilkan data lokal user lain jika memang force live.
+        // Tapi sementara kita percayakan pada logic state override.
+        setRecords(liveData);
     }
 
     if (activeTab === 'history') {
         setHistoryRecords(getAllRecords());
+    }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+        await loadData();
+    } finally {
+        setIsRefreshing(false);
     }
   };
 
@@ -181,38 +196,66 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({ user, on
         </div>
 
         {/* List */}
-        <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
-            <div className="p-4 border-b border-slate-700 font-semibold text-slate-300 flex items-center gap-2">
-                <Users size={18} /> Kehadiran Guru Hari Ini
+        <div className="bg-slate-800/50 border border-slate-700 rounded-2xl overflow-hidden mt-2">
+            <div className="p-4 border-b border-slate-700/50 flex justify-between items-center bg-slate-800/80">
+                <h3 className="font-bold text-white flex items-center gap-2 text-sm">
+                    <Users size={16} className="text-blue-400" /> Kehadiran Guru Hari Ini
+                </h3>
+                <div className="flex items-center gap-2">
+                    <button 
+                      onClick={handleRefresh}
+                      disabled={isRefreshing}
+                      className="text-slate-400 hover:text-white transition-colors p-1"
+                      title="Segarkan Data"
+                    >
+                      <RefreshCw size={14} className={isRefreshing ? 'animate-spin text-blue-400' : ''} />
+                    </button>
+                    <span className="text-[10px] bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-2 py-1 rounded-full font-bold">
+                       {filteredRecords.length} Data
+                    </span>
+                </div>
             </div>
-            <div className="divide-y divide-slate-700">
+            <div className="divide-y divide-slate-700/50">
                 {filteredRecords.length === 0 ? (
-                    <div className="p-8 text-center text-slate-500">Belum ada data absensi hari ini.</div>
+                    <div className="p-8 text-center text-slate-500 text-xs flex flex-col items-center gap-2">
+                        <Clock size={24} className="opacity-20" />
+                        Belum ada guru yang absen hari ini.
+                    </div>
                 ) : (
                     filteredRecords.map((rec) => (
-                        <div key={rec.id} className="p-4 hover:bg-slate-800 transition-colors">
+                        <div key={rec.id} className="p-4 hover:bg-slate-800/50 transition-colors">
                             <div className="flex justify-between items-start gap-3">
                                 <div className="flex items-center gap-3">
+                                    {/* Avatar Initials or Picture */}
                                     {rec.avatar ? (
-                                        <img src={rec.avatar} alt={rec.userName} className="w-10 h-10 rounded-full border border-slate-600 object-cover" />
+                                        <img src={rec.avatar} alt={rec.userName} referrerPolicy="no-referrer" className="w-10 h-10 rounded-full border-2 border-slate-600 object-cover bg-slate-800" />
                                     ) : (
-                                        <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center font-bold text-white border border-slate-600">
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white border-2 ${
+                                            rec.type === 'present' ? 'bg-emerald-600 border-emerald-500/30' : 
+                                            rec.type === 'sppd' ? 'bg-purple-600 border-purple-500/30' :
+                                            'bg-amber-600 border-amber-500/30'
+                                        }`}>
                                             {rec.userName.substring(0,2).toUpperCase()}
                                         </div>
                                     )}
                                     <div>
-                                        <h3 className="font-semibold text-white">{rec.userName}</h3>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold ${
-                                                rec.type === 'present' 
-                                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                                                : rec.type === 'sppd' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' 
-                                                : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                                            }`}>
-                                                {rec.type === 'present' ? 'HADIR' : rec.type.toUpperCase()}
-                                            </span>
+                                        <h3 className="text-sm font-bold text-white">{rec.userName}</h3>
+                                        <div className="flex items-center gap-2 mt-0.5">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className={`w-1.5 h-1.5 rounded-full ${
+                                                    rec.type === 'present' ? 'bg-emerald-400' :
+                                                    rec.type === 'sppd' ? 'bg-purple-400' :
+                                                    'bg-amber-400'
+                                                }`}></span>
+                                                <p className="text-[10px] text-slate-400 font-medium">
+                                                    {rec.type === 'present' ? 'Hadir' : 
+                                                     rec.type === 'sick' ? 'Sakit' : 
+                                                     rec.type === 'leave' ? 'Izin' : 
+                                                     rec.type === 'sppd' ? 'SPPD' : rec.type.toUpperCase()}
+                                                </p>
+                                            </div>
                                             {rec.type === 'present' && rec.notes && rec.notes.includes('TELAT') && (
-                                                <span className="text-[10px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20 font-bold">
+                                                <span className="text-[9px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20 font-bold tracking-wider">
                                                     TERLAMBAT
                                                 </span>
                                             )}
@@ -220,13 +263,12 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({ user, on
                                     </div>
                                 </div>
                                 {rec.type === 'present' && (
-                                    <div className="text-right flex flex-col items-end">
-                                        <div className="flex items-center gap-1.5 bg-slate-900 px-2 py-1 rounded border border-slate-700/50">
-                                             <Clock size={12} className="text-emerald-400" />
-                                             <span className="font-mono font-bold text-white text-sm">{rec.checkInTime}</span>
+                                    <div className="text-right flex flex-col items-end gap-1">
+                                        <div className="text-xs font-mono font-bold text-white bg-slate-900/50 px-2 py-1 rounded border border-slate-700/50">
+                                            {rec.checkInTime}
                                         </div>
                                         {rec.checkOutTime && (
-                                            <div className="flex items-center gap-1.5 mt-1 text-xs text-slate-400">
+                                            <div className="text-[10px] text-slate-400 flex items-center gap-1">
                                                 <LogOut size={10} /> {rec.checkOutTime}
                                             </div>
                                         )}
@@ -235,7 +277,7 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({ user, on
                             </div>
                             
                             {rec.type !== 'present' && (
-                                <div className="mt-3 bg-slate-900/50 p-3 rounded-lg text-xs text-slate-300 border border-slate-700/50 flex items-start gap-2">
+                                <div className="mt-3 bg-slate-900/50 p-2.5 rounded-lg text-xs text-slate-300 border border-slate-700/50 flex items-start gap-2">
                                     {rec.sppdData ? (
                                         <>
                                            <Briefcase size={14} className="text-purple-400 shrink-0 mt-0.5" />
@@ -247,7 +289,7 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({ user, on
                                     ) : (
                                         <>
                                             <FileText size={14} className="text-amber-400 shrink-0 mt-0.5" />
-                                            <p>{rec.notes || 'Tidak ada keterangan'}</p>
+                                            <p>{rec.notes || 'Tidak ada keterangan tambahan'}</p>
                                         </>
                                     )}
                                 </div>
