@@ -57,12 +57,16 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogo
   useEffect(() => {
     setRecord(getTodayRecord(user.id));
     // Load initial peers
-    fetchLivePeers(user.id).then(setPeers);
+    fetchLivePeers(user.id).then(data => {
+        if (data !== null) setPeers(data);
+    });
 
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     // Refresh peers every 30 seconds to keep it "live" from CSV
     const peerInterval = setInterval(() => {
-       fetchLivePeers(user.id).then(setPeers);
+       fetchLivePeers(user.id).then(data => {
+           if (data !== null) setPeers(data);
+       });
     }, 30000);
 
     return () => {
@@ -75,7 +79,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogo
     setIsRefreshing(true);
     try {
         const liveData = await fetchLivePeers(user.id);
-        setPeers(liveData);
+        if (liveData !== null) {
+            setPeers(liveData);
+        }
     } finally {
         setIsRefreshing(false);
     }

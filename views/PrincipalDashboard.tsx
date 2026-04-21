@@ -26,19 +26,20 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({ user, on
   const [downloadEndDate, setDownloadEndDate] = useState(todayStr);
 
   const loadData = async () => {
-    // Memuat data lokal instan sebagai dasar
+    // Memuat data lokal instan sebagai dasar (sementara)
     const localToday = getAllTodayRecords();
-    setRecords(localToday);
-
+    
     // Menarik Data Live secara asinkron dari CSV
     const liveData = await fetchLivePeers(user.id);
-    if (liveData && liveData.length > 0) {
+    
+    if (liveData !== null) {
+        // Jika berhasil pull dari CSV (termasuk jika kosong krn mmg dihapus semua di CSV)
         setRecords(liveData); 
     } else {
-        // Jika tidak ada sama sekali di CSV (mungkin dihapus semua), kita gunakan filter
-        // agar tidak menampilkan data lokal user lain jika memang force live.
-        // Tapi sementara kita percayakan pada logic state override.
-        setRecords(liveData);
+        // Jika fetch putus asa (null/error jaringan/batas dari Google),
+        // Kita biarkan saja UI menggunakan state yang sudah ada sebelumnya.
+        // Tapi jika ini run pertama kali dan state masih kosong, pakai local saja.
+        setRecords(prev => prev.length > 0 ? prev : localToday);
     }
 
     if (activeTab === 'history') {

@@ -334,22 +334,9 @@ export const submitReport = async (
 // URL CSV Publik dari Sheet Absensi
 const LIVE_ABSENSI_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRhhXDs0nazcpQ25Ne_IbHsNI1vO7bBd6_CJv4-LLW1BEmdoZ5B5UA0G8zPQmFAlth1lAhfKdmRswNY/pub?gid=344398975&single=true&output=csv";
 
-export const fetchLivePeers = async (currentUserId?: string): Promise<AttendanceRecord[]> => {
+export const fetchLivePeers = async (currentUserId?: string): Promise<AttendanceRecord[] | null> => {
   const todayStr = new Date().toISOString().split('T')[0];
   const peersMap = new Map<string, AttendanceRecord>();
-
-  // 1. Ambil data lokal khusus untuk user yang sedang login saja (supaya absennya sendiri langsung terlihat)
-  // Jangan mengambil data lokal user lain, karena jika sedang dites di 1 HP/Laptop yang sama, 
-  // data user lain yang sudah dihapus di CSV akan nge-stuck (selalu muncul) akibat disedot dari localStorage ini.
-  const localRecords = getAllTodayRecords();
-  localRecords.forEach(r => {
-      if (!currentUserId || r.userId === currentUserId) {
-          peersMap.set(r.userName, { ...r });
-      } else if (currentUserId && r.userId !== currentUserId) {
-          // Jika kita punya data currentUserId (berarti dipanggil dari komponen dashboard),
-          // Kita hiraukan data lokal absen orang lain. Biarkan CSV yang menentukan apakah mereka hadir/tidak.
-      }
-  });
 
   // Muat data master user untuk mencocokkan foto profil (avatar) rekan
   const allUsers: MockUser[] = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
@@ -358,80 +345,100 @@ export const fetchLivePeers = async (currentUserId?: string): Promise<Attendance
      if (u.name && u.avatar) userAvatarMap.set(u.name.toLowerCase(), u.avatar);
   });
 
+  // 1. Ambil data lokal khusus untuk user yang sedang login saja
+  const localRecords = getAllTodayRecords();
+  localRecords.forEach(r => {
+      if (!currentUserId || r.userId === currentUserId) {
+          // Jika data lokal tidak punya avatar (karena versi app lama), kita inject dari user DB
+          const localRecordCopy = { ...r };
+          if (!localRecordCopy.avatar) {
+             const linkedAvatar = userAvatarMap.get(r.userName.toLowerCase());
+             if (linkedAvatar) localRecordCopy.avatar = linkedAvatar;
+          }
+          peersMap.set(r.userName, localRecordCopy);
+      }
+  });
+
+  // Helper untuk format tanggal aman (antisipasi Google Sheets mereplace YYYY-MM-DD jd MM/DD/YYYY)
+  const isMatchToday = (csvDateStr: string) => {
+      if (!csvDateStr) return false;
+      if (csvDateStr === todayStr) return true;
+      try {
+          const d = new Date(csvDateStr);
+          if (!isNaN(d.getTime())) return d.toISOString().split('T')[0] === todayStr;
+      } catch {}
+      if (csvDateStr.includes('/')) {
+         const parts = csvDateStr.split('/');
+         if (parts.length === 3) {
+            const y = parts[2].length === 4 ? parts[2] : (parts[0].length === 4 ? parts[0] : null);
+            const mon = String(parseInt(todayStr.split('-')[1], 10)); // bln tanpa angka 0 di depan
+            if (y) return csvDateStr.includes(y) && csvDateStr.includes(mon);
+         }
+      }
+      return false;
+  };
+
   // 2. Tarik data dari CSV
   try {
-    // Kami menghapus cache-buster param (_t=) karena Google Docs sering memblokir
-    // query param tidak dikenal dan menyebabkannya redirect yang memicu "Failed to fetch" (CORS Error)
     const res = await fetch(LIVE_ABSENSI_CSV, { cache: 'no-store' });
+    if (!res.ok) throw new Error("Fetch Error");
+    
     const text = await res.text();
+    // Cegah HTML form / Google Docs Error Redirect
+    if (text.trim().toLowerCase().startsWith('<html') || text.trim().toLowerCase().startsWith('<!doc')) {
+        throw new Error("Received HTML Document instead of CSV. Link is restricted or throttling.");
+    }
+
     const rows = text.split('\n');
 
-    // Index CSV: 0:Timestamp, 1:Tanggal, 2:Jam, 3:Tipe(Masuk/Pulang), 4:NIP, 5:Nama, 6:Lokasi, 7:Jarak, 8:Link Foto
     for (let i = 1; i < rows.length; i++) {
-       // Kita split secara aman. Terkadang ada koma di Lokasi, tapi karena Google Sheets menghasilkan CSV standar.
-       // Regex ini memisahkan berdasarkan koma yang tidak ada di dalam tanda kutip.
        const cols = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
        if (cols.length >= 6) {
-          // Bersihkan tanda kutip jika ada
           const cleanCol = (col?: string) => col ? col.replace(/(^"|"$)/g, '').trim() : '';
 
-          const tanggal = cleanCol(cols[1]); // kolom Tanggal
-          // Periksa format tanggal yang konsisten. Google Sheets mungkin memakai YYYY-MM-DD
-          if (tanggal === todayStr || !tanggal) {
-              const jam = cleanCol(cols[2]);      // kolom Jam
-              const tipe = cleanCol(cols[3]);     // kolom Tipe (Masuk / Pulang)
-              const nip = cleanCol(cols[4]);      // NIP
-              const nama = cleanCol(cols[5]);     // Nama
+          const tanggal = cleanCol(cols[1]);
+          
+          if (isMatchToday(tanggal)) {
+              const jam = cleanCol(cols[2]);      
+              const tipe = cleanCol(cols[3]);     
+              const nip = cleanCol(cols[4]);      
+              const nama = cleanCol(cols[5]);     
 
-              if (tanggal === todayStr && nama) {
-                  // Tentukan Tipe Asli dari CSV
+              if (nama) {
                   let exactType = 'present';
                   if (tipe.toLowerCase() === 'sppd') exactType = 'sppd';
                   if (tipe.toLowerCase() === 'sakit') exactType = 'sick';
                   if (tipe.toLowerCase() === 'izin') exactType = 'leave';
 
                   if (!peersMap.has(nama)) {
-                     // Jika tidak ada di lokal (misal absen dari HP lain)
-                     // Coba temukan avatar dari master data user
                      const linkedAvatar = userAvatarMap.get(nama.toLowerCase());
 
                      peersMap.set(nama, {
                         id: nip || nama,
-                        userId: nip || nama, // Kita gunakan NIP atau Nama sbg ID jika tdk tahu
+                        userId: nip || nama, 
                         userName: nama,
-                        date: tanggal,
-                        avatar: linkedAvatar, // Menggabungkan foto profil
+                        date: todayStr, // Pastikan format kembali standard
+                        avatar: linkedAvatar, 
                         type: exactType as any
                      } as AttendanceRecord);
                   }
 
-                  // Update data berdasarkan tipe dari baris
                   const record = peersMap.get(nama)!;
-                  
-                  // Jika di CSV tertulis Sakit/Izin/SPPD, JANGAN timpa dengan present
-                  // dan update tipe jika saat ini present tapi ternyata ada catatan Sakit/Izin/SPPD
-                  if (exactType !== 'present') {
-                      record.type = exactType as any;
-                  }
-
-                  // Update jam kedatangan/kepulangan berdasarkan row
-                  if (tipe === 'Masuk' || tipe === 'CHECK_IN') {
-                      record.checkInTime = jam;
-                  } else if (tipe === 'Pulang' || tipe === 'CHECK_OUT') {
-                      record.checkOutTime = jam;
-                  }
-                  
-                  // Pastikan type-nya tersetting minimal present jika belum
+                  if (exactType !== 'present') record.type = exactType as any;
+                  if (tipe === 'Masuk' || tipe === 'CHECK_IN') record.checkInTime = jam;
+                  else if (tipe === 'Pulang' || tipe === 'CHECK_OUT') record.checkOutTime = jam;
                   if (!record.type) record.type = 'present';
               }
           }
        }
     }
   } catch (err) {
-    console.error("Gagal menarik live data dari CSV:", err);
+    console.error("Gagal menarik live data API Google Sheets:", err);
+    // Return NULL agar Caller bisa mendeteksi bahwa ini error jaringan, 
+    // Jadi layar UI TIDAK dikosongkan (datanya tidak hilang saat re-render).
+    return null;
   }
 
-  // Convert map ke array, urutkan berdasarkan yang sudah hadir di atas
   const resultArray = Array.from(peersMap.values());
   resultArray.sort((a, b) => a.userName.localeCompare(b.userName));
   return resultArray;
