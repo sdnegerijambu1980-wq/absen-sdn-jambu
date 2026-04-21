@@ -342,13 +342,11 @@ export const fetchLivePeers = async (): Promise<AttendanceRecord[]> => {
   const localRecords = getAllTodayRecords();
   localRecords.forEach(r => peersMap.set(r.userName, { ...r }));
 
-  // 2. Tarik data dari CSV
+    // 2. Tarik data dari CSV
   try {
-    // Tambah timestamp agar browser tidak melakukan caching pada request fetch ini
-    // Memeriksa apakah URL sudah mengandung parameter
-    const separator = LIVE_ABSENSI_CSV.includes('?') ? '&' : '?';
-    const cacheBuster = `_t=${new Date().getTime()}`;
-    const res = await fetch(LIVE_ABSENSI_CSV + separator + cacheBuster, { cache: 'no-store' });
+    // Kami menghapus cache-buster param (_t=) karena Google Docs sering memblokir
+    // query param tidak dikenal dan menyebabkannya redirect yang memicu "Failed to fetch" (CORS Error)
+    const res = await fetch(LIVE_ABSENSI_CSV, { cache: 'no-store' });
     const text = await res.text();
     const rows = text.split('\n');
 

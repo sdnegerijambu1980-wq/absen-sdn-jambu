@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, AttendanceRecord } from '../types';
-import { getAllTodayRecords, getAllRecords, downloadMonthlyReport } from '../services/mockBackend';
+import { getAllTodayRecords, getAllRecords, downloadMonthlyReport, fetchLivePeers } from '../services/mockBackend';
 import { Download, Users, UserCheck, UserX, Search, School, Home, User as UserIcon, FileDown, Calendar, Clock, AlertTriangle, CheckCircle2, HeartPulse, FileText, Briefcase, MapPin, LogOut } from 'lucide-react';
 import { ProfileView } from './ProfileView';
 import { motion, AnimatePresence } from 'motion/react';
@@ -24,21 +24,29 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({ user, on
   const [downloadStartDate, setDownloadStartDate] = useState(firstDayStr);
   const [downloadEndDate, setDownloadEndDate] = useState(todayStr);
 
-  useEffect(() => {
-    // Load Today's records for Home
-    setRecords(getAllTodayRecords());
-    
-    // Load All History for History Tab
+  const loadData = async () => {
+    // Memuat data lokal instan sebagai dasar
+    const localToday = getAllTodayRecords();
+    setRecords(localToday);
+
+    // Menarik Data Live secara asinkron dari CSV
+    const liveData = await fetchLivePeers();
+    if (liveData && liveData.length > 0) {
+        setRecords(liveData); 
+    }
+
     if (activeTab === 'history') {
         setHistoryRecords(getAllRecords());
     }
+  };
 
-    // Polling for updates every 30 seconds
+  useEffect(() => {
+    // Initial Load
+    loadData();
+
+    // Polling for live updates every 30 seconds
     const interval = setInterval(() => {
-        setRecords(getAllTodayRecords());
-        if (activeTab === 'history') {
-            setHistoryRecords(getAllRecords());
-        }
+        loadData();
     }, 30000);
     return () => clearInterval(interval);
   }, [activeTab]);
