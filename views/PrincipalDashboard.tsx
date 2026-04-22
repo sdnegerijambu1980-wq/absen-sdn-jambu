@@ -11,6 +11,7 @@ interface PrincipalDashboardProps {
 }
 
 export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({ user, onLogout }) => {
+  const [currentTime, setCurrentTime] = useState(new Date());
   const [activeTab, setActiveTab] = useState<'home' | 'history' | 'profile'>('home');
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [historyRecords, setHistoryRecords] = useState<AttendanceRecord[]>([]);
@@ -24,6 +25,11 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({ user, on
   
   const [downloadStartDate, setDownloadStartDate] = useState(firstDayStr);
   const [downloadEndDate, setDownloadEndDate] = useState(todayStr);
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const loadData = async () => {
     // Memuat data lokal instan sebagai dasar (sementara)
@@ -119,9 +125,21 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({ user, on
         
         {/* Title */}
         <div>
-           <p className="text-emerald-400 font-medium text-sm mb-1">{getGreeting()}, {honorific} {user.name}</p>
-           <h2 className="text-xl font-bold text-white">Dashboard Kepala Sekolah</h2>
+           <h2 className="text-xl font-bold text-white">{getGreeting()}, {honorific} {user.name}</h2>
            <p className="text-sm text-slate-400">Monitoring kehadiran guru realtime</p>
+        </div>
+
+        {/* Clock Card */}
+        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 border border-slate-700/50 shadow-xl relative overflow-hidden group">
+          <div className="absolute -right-4 -top-4 w-32 h-32 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/20 transition-all"></div>
+          <div className="relative z-10 flex flex-col items-center justify-center py-2">
+            <span className="text-slate-400 text-sm uppercase tracking-wider font-medium mb-1">
+              {currentTime.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </span>
+            <span className="text-5xl font-mono font-bold text-white tracking-tighter tabular-nums">
+              {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -200,7 +218,7 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({ user, on
         <div className="bg-slate-800/50 border border-slate-700 rounded-2xl overflow-hidden mt-2">
             <div className="p-4 border-b border-slate-700/50 flex justify-between items-center bg-slate-800/80">
                 <h3 className="font-bold text-white flex items-center gap-2 text-sm">
-                    <Users size={16} className="text-blue-400" /> Kehadiran Guru Hari Ini
+                    <Users size={16} className="text-blue-400" /> Rekap Kehadiran Hari Ini
                 </h3>
                 <div className="flex items-center gap-2">
                     <button 
@@ -224,14 +242,14 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({ user, on
                     </div>
                 ) : (
                     filteredRecords.map((rec) => (
-                        <div key={rec.id} className="p-4 hover:bg-slate-800/50 transition-colors">
-                            <div className="flex justify-between items-start gap-3">
+                        <div key={rec.id} className="p-3 hover:bg-slate-800/50 transition-colors">
+                            <div className="flex justify-between items-center">
                                 <div className="flex items-center gap-3">
                                     {/* Avatar Initials or Picture */}
                                     {rec.avatar ? (
-                                        <img src={rec.avatar} alt={rec.userName} referrerPolicy="no-referrer" className="w-10 h-10 rounded-full border-2 border-slate-600 object-cover bg-slate-800" />
+                                        <img src={rec.avatar} alt={rec.userName} referrerPolicy="no-referrer" className="w-8 h-8 rounded-full border-2 border-slate-600 object-cover bg-slate-800" />
                                     ) : (
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white border-2 ${
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white border-2 ${
                                             rec.type === 'present' ? 'bg-emerald-600 border-emerald-500/30' : 
                                             rec.type === 'sppd' ? 'bg-purple-600 border-purple-500/30' :
                                             'bg-amber-600 border-amber-500/30'
@@ -240,56 +258,60 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({ user, on
                                         </div>
                                     )}
                                     <div>
-                                        <h3 className="text-sm font-bold text-white">{rec.userName}</h3>
-                                        <div className="flex items-center gap-2 mt-0.5">
-                                            <div className="flex items-center gap-1.5">
-                                                <span className={`w-1.5 h-1.5 rounded-full ${
-                                                    rec.type === 'present' ? 'bg-emerald-400' :
-                                                    rec.type === 'sppd' ? 'bg-purple-400' :
-                                                    'bg-amber-400'
-                                                }`}></span>
-                                                <p className="text-[10px] text-slate-400 font-medium">
-                                                    {rec.type === 'present' ? 'Hadir' : 
-                                                     rec.type === 'sick' ? 'Sakit' : 
-                                                     rec.type === 'leave' ? 'Izin' : 
-                                                     rec.type === 'sppd' ? 'SPPD' : rec.type.toUpperCase()}
-                                                </p>
-                                            </div>
-                                            {rec.type === 'present' && rec.notes && rec.notes.includes('TELAT') && (
-                                                <span className="text-[9px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20 font-bold tracking-wider">
-                                                    TERLAMBAT
-                                                </span>
-                                            )}
+                                        <p className="text-sm font-medium text-white line-clamp-1">
+                                            {rec.userName} {rec.notes && rec.notes.includes('TELAT') && <span className="text-[10px] text-red-400 font-normal ml-1">(Telat)</span>}
+                                        </p>
+                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                            <span className={`w-1.5 h-1.5 rounded-full ${
+                                                rec.type === 'present' ? 'bg-emerald-400' :
+                                                rec.type === 'sppd' ? 'bg-purple-400' :
+                                                'bg-amber-400'
+                                            }`}></span>
+                                            <p className="text-[10px] text-slate-400 font-medium">
+                                                {rec.type === 'present' ? 'Hadir' : 
+                                                 rec.type === 'sick' ? 'Sakit' : 
+                                                 rec.type === 'leave' ? 'Izin' : 
+                                                 rec.type === 'sppd' ? 'SPPD' : rec.type.toUpperCase()}
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
-                                {rec.type === 'present' && (
-                                    <div className="text-right flex flex-col items-end gap-1">
-                                        <div className="text-xs font-mono font-bold text-white bg-slate-900/50 px-2 py-1 rounded border border-slate-700/50">
-                                            {rec.checkInTime}
-                                        </div>
-                                        {rec.checkOutTime && (
-                                            <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                                                <LogOut size={10} /> {rec.checkOutTime}
+
+                                <div className="text-right flex flex-col items-end gap-1">
+                                    {rec.type === 'present' ? (
+                                        <>
+                                            <div className="text-[10px] font-mono text-emerald-400 font-medium">
+                                                Datang: {rec.checkInTime || '--:--'}
                                             </div>
-                                        )}
-                                    </div>
-                                )}
+                                            <div className="text-[10px] font-mono text-blue-400 font-medium">
+                                                Pulang: {rec.checkOutTime || '--:--'}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                                            rec.type === 'sick' ? 'text-red-400 bg-red-400/10 border border-red-400/20' : 
+                                            rec.type === 'leave' ? 'text-amber-400 bg-amber-400/10 border border-amber-400/20' : 
+                                            'text-purple-400 bg-purple-400/10 border border-purple-400/20'
+                                        }`}>
+                                            {rec.type === 'sick' ? 'Sakit' : rec.type === 'leave' ? 'Izin' : 'SPPD'}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                             
                             {rec.type !== 'present' && (
-                                <div className="mt-3 bg-slate-900/50 p-2.5 rounded-lg text-xs text-slate-300 border border-slate-700/50 flex items-start gap-2">
+                                <div className="mt-3 bg-slate-900/50 p-2.5 rounded-lg text-[11px] text-slate-300 border border-slate-700/50 flex items-start gap-2">
                                     {rec.sppdData ? (
                                         <>
-                                           <Briefcase size={14} className="text-purple-400 shrink-0 mt-0.5" />
+                                           <Briefcase size={12} className="text-purple-400 shrink-0 mt-0.5" />
                                            <div>
                                                <p className="font-bold text-purple-400">SPPD: {rec.sppdData.activityType}</p>
-                                               <p className="text-slate-400 mt-0.5">{rec.sppdData.destination}</p>
+                                               <p className="text-slate-400">{rec.sppdData.destination}</p>
                                            </div>
                                         </>
                                     ) : (
                                         <>
-                                            <FileText size={14} className="text-amber-400 shrink-0 mt-0.5" />
+                                            <FileText size={12} className="text-amber-400 shrink-0 mt-0.5" />
                                             <p>{rec.notes || 'Tidak ada keterangan tambahan'}</p>
                                         </>
                                     )}

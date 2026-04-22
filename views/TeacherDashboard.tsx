@@ -172,9 +172,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogo
           const lat = position.coords.latitude;
           const lon = position.coords.longitude;
           
-          // SDN Jambu Coordinates
-          const targetLat = -6.114196248039071;
-          const targetLon = 106.2276108127061;
+          // Target Coordinates
+          const targetLat = -6.282759;
+          const targetLon = 106.264251;
 
           // Haversine formula to calculate distance in meters
           const R = 6371e3; // Earth radius in meters
@@ -671,6 +671,24 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogo
     </div>
   );
 
+  const getParsedDistance = () => {
+    if (location.includes('|')) {
+        return parseInt(location.split('|')[1], 10);
+    }
+    return null;
+  };
+
+  const currentDistance = getParsedDistance();
+  const isOutOfRange = currentDistance !== null && currentDistance > 50;
+
+  const displayLocation = () => {
+    if (!location) return isLocating ? "Sedang mendeteksi lokasi..." : "Klik refresh untuk memuat ulang koordinat";
+    if (currentDistance !== null) {
+       return currentDistance > 50 ? `Di Luar Jangkauan (${currentDistance} m)` : `Lokasi Sesuai (${currentDistance} m)`;
+    }
+    return location;
+  };
+
   return (
     <>
       <AnimatePresence mode="wait">
@@ -753,9 +771,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogo
                     <RefreshCw size={14} className={isLocating ? "animate-spin" : ""} />
                 </button>
               </label>
-              <div className={`bg-slate-800 border border-slate-700 rounded-lg p-3 text-sm flex items-center gap-2 ${!location ? 'text-slate-500 italic' : 'text-emerald-400'}`}>
-                 <MapPin size={16} />
-                 <span className="truncate">{location || (isLocating ? "Sedang mendeteksi lokasi..." : "Klik refresh untuk lokasi")}</span>
+              <div className={`bg-slate-800 border rounded-lg p-3 text-sm flex items-center gap-2 ${!location ? 'text-slate-500 italic border-slate-700' : (isOutOfRange ? 'text-rose-400 border-rose-500/50 bg-rose-500/10 font-bold tracking-wide' : 'text-emerald-400 border-slate-700')}`}>
+                 {isOutOfRange ? <AlertTriangle size={16} className="animate-pulse" /> : <MapPin size={16} />}
+                 <span className="truncate">{displayLocation()}</span>
               </div>
            </div>
 
@@ -790,7 +808,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogo
 
            <button 
              onClick={handleAttendanceSubmit}
-             disabled={loading || !photo || !location}
+             disabled={loading || !photo || !location || isOutOfRange}
              className="mt-2 w-full bg-primary hover:bg-emerald-600 active:scale-95 text-white font-semibold py-3.5 rounded-xl transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
            >
              {loading ? 'Mengirim Data...' : (modalType === 'checkin' ? 'Kirim Absen Masuk' : 'Kirim Absen Pulang')}
