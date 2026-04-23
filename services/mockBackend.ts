@@ -123,9 +123,14 @@ export const loginUser = async (username: string, password: string, requiredRole
   return null;
 };
 
+export const getLocalDateString = (): string => {
+  const date = new Date();
+  return new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+};
+
 export const getTodayRecord = (userId: string): AttendanceRecord | undefined => {
   const records: AttendanceRecord[] = JSON.parse(localStorage.getItem(ATTENDANCE_KEY) || '[]');
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalDateString();
   return records.find(r => r.userId === userId && r.date === today);
 };
 
@@ -139,7 +144,7 @@ export const getUserHistory = (userId: string): AttendanceRecord[] => {
 
 export const getAllTodayRecords = (): AttendanceRecord[] => {
   const records: AttendanceRecord[] = JSON.parse(localStorage.getItem(ATTENDANCE_KEY) || '[]');
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalDateString();
   return records.filter(r => r.date === today);
 };
 
@@ -182,7 +187,7 @@ export const sendToGAS = async (payload: any) => {
 export const markCheckIn = async (user: User, location: string, photo: string, distanceValue?: string): Promise<AttendanceRecord> => {
   await new Promise(resolve => setTimeout(resolve, 800));
   const todayDate = new Date();
-  const today = todayDate.toISOString().split('T')[0];
+  const today = getLocalDateString();
   const time = todayDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
   
   // Calculate Late Logic (07:30)
@@ -267,7 +272,7 @@ export const submitReport = async (
   endDate?: string
 ): Promise<AttendanceRecord> => {
   await new Promise(resolve => setTimeout(resolve, 300));
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalDateString();
   const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
   const existing = getTodayRecord(user.id);
@@ -335,7 +340,7 @@ export const submitReport = async (
 const LIVE_ABSENSI_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRhhXDs0nazcpQ25Ne_IbHsNI1vO7bBd6_CJv4-LLW1BEmdoZ5B5UA0G8zPQmFAlth1lAhfKdmRswNY/pub?gid=344398975&single=true&output=csv";
 
 export const fetchLivePeers = async (currentUserId?: string): Promise<AttendanceRecord[] | null> => {
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateString();
   const peersMap = new Map<string, AttendanceRecord>();
 
   // Muat data master user untuk mencocokkan foto profil (avatar) rekan
@@ -365,7 +370,10 @@ export const fetchLivePeers = async (currentUserId?: string): Promise<Attendance
       if (csvDateStr === todayStr) return true;
       try {
           const d = new Date(csvDateStr);
-          if (!isNaN(d.getTime())) return d.toISOString().split('T')[0] === todayStr;
+          if (!isNaN(d.getTime())) {
+              const localD = new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+              return localD === todayStr || d.toISOString().split('T')[0] === todayStr;
+          }
       } catch {}
       if (csvDateStr.includes('/')) {
          const parts = csvDateStr.split('/');

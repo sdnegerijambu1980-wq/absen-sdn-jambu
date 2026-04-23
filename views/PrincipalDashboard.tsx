@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, AttendanceRecord } from '../types';
-import { getAllTodayRecords, getAllRecords, downloadMonthlyReport, fetchLivePeers } from '../services/mockBackend';
+import { getAllTodayRecords, getAllRecords, downloadMonthlyReport, fetchLivePeers, getLocalDateString } from '../services/mockBackend';
 import { Download, Users, UserCheck, UserX, Search, School, Home, User as UserIcon, FileDown, Calendar, Clock, AlertTriangle, CheckCircle2, HeartPulse, FileText, Briefcase, MapPin, LogOut, RefreshCw } from 'lucide-react';
 import { ProfileView } from './ProfileView';
 import { motion, AnimatePresence } from 'motion/react';
@@ -20,7 +20,7 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({ user, on
   const [historyFilter, setHistoryFilter] = useState('');
 
   // Default download range: 1st of current month to Today
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateString();
   const firstDayStr = todayStr.substring(0, 7) + '-01';
   
   const [downloadStartDate, setDownloadStartDate] = useState(firstDayStr);

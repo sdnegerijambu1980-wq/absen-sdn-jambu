@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, AttendanceRecord, SppdData } from '../types';
-import { getTodayRecord, markCheckIn, markCheckOut, submitReport, getUserHistory, fetchLivePeers } from '../services/mockBackend';
+import { getTodayRecord, markCheckIn, markCheckOut, submitReport, getUserHistory, fetchLivePeers, getLocalDateString } from '../services/mockBackend';
 import { MapPin, Briefcase, HeartPulse, School, Home, User as UserIcon, LogOut, Camera, RotateCw, RefreshCw, Upload, Image as ImageIcon, Plus, X, FileText, AlertTriangle, Calendar, Clock, Users, CheckCircle2, ArrowRight } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { ProfileView } from './ProfileView';
@@ -22,7 +22,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogo
   const [loading, setLoading] = useState(false);
   const [modalType, setModalType] = useState<'sick' | 'leave' | 'sppd' | 'checkin' | 'checkout' | null>(null);
   
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateString();
   
   // Generic Form Data
   const [formData, setFormData] = useState({ 
