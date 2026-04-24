@@ -253,8 +253,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogo
         const distanceNumber = parseInt(parts[1], 10);
         distanceValue = distanceNumber.toString() + " m";
 
-        if (distanceNumber > 50) {
-            alert(`JARAK ANDA KEJAUHAN!\n\nJarak Anda saat ini: ${distanceNumber} meter dari tapak sekolah.\nMaksimal jarak yang diizinkan adalah 50 meter. Silakan mendekat ke area sekolah.`);
+        if (distanceNumber > 100) {
+            alert(`JARAK ANDA KEJAUHAN!\n\nJarak Anda saat ini: ${distanceNumber} meter dari tapak sekolah.\nMaksimal jarak yang diizinkan adalah 100 meter. Silakan mendekat ke area sekolah.`);
             return; // Batalkan proses!
         }
     }
@@ -679,12 +679,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogo
   };
 
   const currentDistance = getParsedDistance();
-  const isOutOfRange = currentDistance !== null && currentDistance > 50;
+  const isOutOfRange = currentDistance !== null && currentDistance > 100;
 
   const displayLocation = () => {
     if (!location) return isLocating ? "Sedang mendeteksi lokasi..." : "Klik refresh untuk memuat ulang koordinat";
     if (currentDistance !== null) {
-       return currentDistance > 50 ? `Di Luar Jangkauan (${currentDistance} m)` : `Lokasi Sesuai (${currentDistance} m)`;
+       return currentDistance > 100 ? `Di Luar Jangkauan (${currentDistance} m)` : `Lokasi Sesuai (${currentDistance} m)`;
     }
     return location;
   };
